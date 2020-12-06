@@ -1,0 +1,112 @@
+version: '3.7'
+
+volumes:
+    prometheus_data: {}
+
+services:
+
+  nginx:
+    image: nginx
+    container_name: dockmon-nginx 
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf
+      - ./nginx/conf.d/default.conf:/etc/nginx/conf.d/default.conf
+      - ./prometheus/.credentials:/etc/prometheus/.credentials
+      - ./prometheus/ssl/:/etc/prometheus/ssl
+      - ./nginx/www/:/opt/www/
+    restart: "always"
+    network_mode: host
+    ports:
+      - 80:80
+      - 443:443
+      - 1234:1234
+  
+  promtool:
+    image: jacknagel/promtool
+    container_name: dockmon-promtool
+    volumes: 
+      - ./prometheus:/tmp/
+    command: check config /tmp/prometheus.yml
+  
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: dockmon-prometheus-monitoring
+    volumes:
+      - ./prometheus/:/etc/prometheus/
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+      - '--web.console.templates=/usr/share/prometheus/consoles'
+      - '--web.listen-address=0.0.0.0:9090'
+      - '--web.enable-admin-api'
+      - '--web.external-url=https://localhost:1234'
+    ports:
+      - 9090:9090
+    depends_on: 
+      - promtool
+
+  alertmanager:
+    image: prom/alertmanager
+    container_name: dockmon-alertmanager
+    ports:
+      - 9093:9093
+    volumes:
+      - ./alertmanager/:/etc/alertmanager/
+      - ./data/alertmanager:/data
+    command:
+      - '--config.file=/etc/alertmanager/alertmanager.yml'
+      - '--storage.path=/data'
+  
+  pushgateway:
+    image: prom/pushgateway
+    container_name: dockmon-pushgateway
+    restart: unless-stopped
+    ports:
+      - 9091:9091
+      
+  db:
+    image: mysql:5.6
+    container_name: dockmon-mysql-grafana
+    environment:
+      MYSQL_ROOT_PASSWORD: HKf16a@123
+      MYSQL_DATABASE: grafana
+      MYSQL_USER: grafana
+      MYSQL_PASSWORD: BYK6138t@123
+    command: [mysqld, --character-set-server=utf8mb4, --collation-server=utf8mb4_unicode_ci, --innodb_monitor_enable=all, --max-connections=1001]
+    ports:
+      - 3306:3306
+    healthcheck:
+      test: ["CMD", "mysqladmin" ,"ping", "-h", "localhost"]
+      timeout: 10s
+      retries: 10
+    
+  grafana:
+    image: grafana/grafana:latest
+    container_name: dockmon-grafana-dashboard 
+    volumes:
+      - ./grafana/provisioning/:/etc/grafana/provisioning/
+    environment:
+      - GF_SERVER_DOMAIN=localhost
+      - GF_SERVER_ROOT_URL=https://localhost:3000
+      - GF_SERVER_ROUTER_LOGGING=true
+      - GF_DATABASE_NAME=grafana
+      - GF_DATABASE_USER=grafana
+      - GF_DATABASE_PASSWORD=BYK6138t@123
+      - GF_DATABASE_TYPE=mysql
+      - GF_DATABASE_HOST=db:3306
+      - GF_DATABASE_MAX_OPEN_CONN=300
+      - GF_SESSION_PROVIDER=mysql
+      - GF_SESSION_PROVIDER_CONFIG=grafana:BYK6138t@123@tcp(db:3306)/grafana?allowNativePasswords=true
+      - GF_LOG_CONSOLE_FORMAT=json
+      - GF_LOG_FILTERS=alerting.notifier:debug,alerting.notifier.slack:debug,auth:debug
+      - GF_AUTH_TOKEN_ROTATION_INTERVAL_MINUTES=2
+      - GF_SECURITY_ADMIN_USER=${ADMIN_USER:-admin}
+      - GF_SECURITY_ADMIN_PASSWORD=${ADMIN_PASSWORD:-HKf16a123}
+      - GF_USERS_ALLOW_SIGN_UP=false
+    ports:
+      - 3000:3000
+    depends_on: 
+      - db
+    command: ["./grafana/valida-mysql.sh", "db:3306", "--", "python", "app.py"]
