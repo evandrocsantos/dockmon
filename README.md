@@ -2,7 +2,6 @@
 
 [![hackmd-github-sync-badge](https://hackmd.io/o8hoT9nsRP-gdEa1MHLN_A/badge)](https://hackmd.io/o8hoT9nsRP-gdEa1MHLN_A)
 
-
 ![Projeto](https://img.shields.io/badge/Equipe-DevOps-green?style=for-the-badge&logo=superuser) ![Projeto](https://img.shields.io/badge/Projeto-Monitoramento-green?style=for-the-badge&logo=prometheus)
 
 ## Apresentação
@@ -145,7 +144,6 @@ O nosso ambiente de monitoramento está configurado da seguinte maneira:
 | dockmon-mysql-grafana         | Contêiner que executa o banco de dados dedicado à aplicação Grafana                           |
 | dockmon-alertmanager          | Contêiner que executa a aplicação Alert Manager, que é responsável por disparar os alertas de eventos observados no ambiente.                                                                                                | 
 | dockmon-nginx                 | Contêiner que executa o NGINX como proxy reverso, sobre as demais aplicações.                 |
-| dockmon-promtool              | Contêiner que executa a ferramenta promtool, a que é responsável por checar e validar a existência de erros ou inconsistências nos arquivos ```prometheus.yml``` e ```prometheus.rules.yml```. |
 
 A seguir, veremos a configuração de cada um, em detalhe.
 
@@ -223,32 +221,6 @@ Além de fazer o redirecionamento, o **NGINX** requerirá a validação por meio
 > * **Senha**: BYK6138T@$%79!
 
 O NGINX também terá em sua configuração, futuramente, o **Alert Manager** e o **Grafana** por trás do *proxy reverso*.
-
-
----
-
-## PROMTOOL
-
-
-O **Promtool** é o validador do código dos arquivos ```prometheus.yml``` e ```prometheus.rules.yml```, verificando se há inconsistência na indentação, ou na forma de declaração utilizada.
-```gherkin=
-  promtool:
-    image: jacknagel/promtool
-    container_name: dockmon-promtool
-    volumes: 
-      - ./prometheus:/tmp/
-    command: check config /tmp/prometheus.yml
-```
-Em linhas gerais, o contêiner executa o comando de checagem do arquivo e como saída temos a resposta se há ou não falhas. Se sim, ele nos indica em qual linha e impede que o contêiner do **Prometheus** seja carregado com falhas. 
-```gherkin=
-./promtool check config prometheus.yml
-
-Checking prometheus.yml
-  SUCCESS: 1 rule files found
-
-Checking prometheus.rules.yml
-  FAILED: [yaml: line 174: did not find expected '-' indicator]
-```
 
 
 ---
