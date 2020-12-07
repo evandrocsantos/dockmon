@@ -777,9 +777,9 @@ Após isso, poderemos já observar a coleta, na interface da aplicação.
 
 #### Conclusão
 
-Estes passos que seguimos, bem como a estrutura de hierarquia de arquivos que utilizamos são os mesmos que devem ser seguidos para todos os demais exporters que venham a ser configurados.
+Estes passos que seguimos, bem como a estrutura de hierarquia de arquivos que utilizamos são os mesmos que devem ser seguidos para todos os demais exporters que venham a ser configurados, em seu ambiente.
 
-Isso auxiliará na configuração e sustentação do ambiente, por meio de qualquer membro da equipe.
+Isso auxiliará na configuração e sustentação do serviço, por meio de qualquer membro da sua equipe.
 
 :+1:
 
