@@ -1,0 +1,200 @@
+kind: pipeline
+name: default
+
+workspace:
+  base: /go
+  path: src/github.com/oliver006/redis_exporter
+
+
+services:
+  - name: redis5
+    image: redis:5
+    commands:
+      - "/usr/local/bin/redis-server --port 6383  --dbfilename dump5.rdb"
+    ports:
+      - 6383
+
+  - name: redis6
+    image: redis:6.0-rc1
+    commands:
+      - "/usr/local/bin/redis-server --protected-mode no --dbfilename dump6.rdb"
+    ports:
+      - 6379
+
+  - name: pwd-redis5
+    image: redis:5
+    commands:
+      - "/usr/local/bin/redis-server --port 6380 --requirepass redis-password --dbfilename dump5-pwd.rdb"
+    ports:
+      - 6380
+
+  - name: redis-2-8
+    image: redis:2.8
+    commands:
+      - "/usr/local/bin/redis-server --port 6381 --dbfilename dump2-8.rdb"
+    ports:
+      - 6381
+
+  - name: keydb-01
+    image: "eqalpha/keydb:x86_64_v5.3.0"
+    commands:
+      - "keydb-server --protected-mode no --port 6401 --dbfilename dump-keydb-01.rdb"
+    ports:
+      - 6401
+
+  - name: keydb-02
+    image: "eqalpha/keydb:x86_64_v5.3.0"
+    commands:
+      - "keydb-server --protected-mode no --port 6402 --active-replica yes --replicaof keydb-01 6401  --dbfilename dump-keydb-02.rdb"
+    ports:
+      - 6402
+
+  - name: redis-cluster
+    image: grokzen/redis-cluster
+    ports: [7000, 7001, 7002, 7003, 7004, 7005]
+
+  - name: tile38
+    image: tile38/tile38:latest
+    ports:
+      - 9851
+
+
+steps:
+  - name: tests
+    image: "golang:1.13"
+    environment:
+      GO111MODULE: on
+      LOG_LEVEL: "info"
+      TEST_REDIS_URI: "redis://redis6:6379"
+      TEST_REDIS5_URI: "redis://redis5:6383"
+      TEST_REDIS6_URI: "redis://redis6:6379"
+      TEST_REDIS_2_8_URI: "redis://redis-2-8:6381"
+      TEST_KEYDB01_URI: "redis://keydb-01:6401"
+      TEST_KEYDB02_URI: "redis://keydb-02:6402"
+      TEST_PWD_REDIS_URI: "redis://h:redis-password@pwd-redis5:6380"
+      TEST_REDIS_CLUSTER_MASTER_URI: "redis://redis-cluster:7000"
+      TEST_REDIS_CLUSTER_SLAVE_URI: "redis://redis-cluster:7005"
+      TEST_TILE38_URI: "redis://tile38:9851"
+      COVERALLS_TOKEN:
+        from_secret: coveralls-token
+    commands:
+      - 'go build -mod=vendor'
+      - "sleep 20"   # let the redis test instances all come up first
+      - 'go test -mod=vendor -v -covermode=atomic -cover -race -coverprofile=coverage.txt .'
+      - 'echo "checking gofmt"'
+      - 'echo " ! gofmt -d *.go       2>&1 | read " | bash'
+      - 'echo "checking gofmt - DONE"'
+      - 'go vet -mod=vendor .'
+      - 'go get github.com/mattn/goveralls'
+      - '/go/bin/goveralls -coverprofile=coverage.txt -service=drone.io'
+    when:
+      event:
+        - pull_request
+        - push
+
+
+  - name: coverage-codecov
+    image: plugins/codecov
+    settings:
+      token:
+        from_secret: codecov-token
+      files:
+        - coverage.txt
+    when:
+      event:
+        - pull_request
+        - push
+
+
+  - name: release-docker-image-scratch
+    image: plugins/docker
+    settings:
+      tags: "latest,latest-amd64,${DRONE_TAG},${DRONE_TAG}-amd64"
+      dockerfile: ./docker/Dockerfile.amd64
+      repo: oliver006/redis_exporter
+      target: scratch
+      build_args:
+        - 'TAG=${DRONE_TAG}'
+        - 'SHA1=${DRONE_COMMIT_SHA}'
+        - 'GOARCH=amd64'
+      username:
+        from_secret: docker_user
+      password:
+        from_secret: docker_pass
+    when:
+      event:
+        - tag
+
+
+  - name: release-docker-image-alpine-arm64
+    image: plugins/docker
+    settings:
+      tags: "latest-arm64,${DRONE_TAG}-arm64"
+      dockerfile: ./docker/Dockerfile.arm64
+      repo: oliver006/redis_exporter
+      target: alpine-arm64
+      build_args:
+        - 'TAG=${DRONE_TAG}'
+        - 'SHA1=${DRONE_COMMIT_SHA}'
+        - 'GOARCH=arm64'
+      username:
+        from_secret: docker_user
+      password:
+        from_secret: docker_pass
+    when:
+      event:
+        - tag
+
+
+  - name: release-docker-image-alpine-arm
+    image: plugins/docker
+    settings:
+      tags: "latest-arm,${DRONE_TAG}-arm"
+      dockerfile: ./docker/Dockerfile.arm
+      repo: oliver006/redis_exporter
+      target: alpine-arm
+      build_args:
+        - 'TAG=${DRONE_TAG}'
+        - 'SHA1=${DRONE_COMMIT_SHA}'
+        - 'GOARCH=arm'
+      username:
+        from_secret: docker_user
+      password:
+        from_secret: docker_pass
+    when:
+      event:
+        - tag
+
+
+  - name: release-docker-image-alpine-amd64
+    image: plugins/docker
+    settings:
+      tags: "alpine,${DRONE_TAG}-alpine"
+      dockerfile: ./docker/Dockerfile.amd64
+      repo: oliver006/redis_exporter
+      target: alpine
+      build_args:
+        - 'TAG=${DRONE_TAG}'
+        - 'SHA1=${DRONE_COMMIT_SHA}'
+        - 'GOARCH=amd64'
+      username:
+        from_secret: docker_user
+      password:
+        from_secret: docker_pass
+    when:
+      event:
+        - tag
+
+
+  - name: release-github-binaries
+    image: "golang:1.13"
+    environment:
+      GITHUB_TOKEN:
+        from_secret: github_token
+      GO111MODULE: on
+    commands:
+      - "apt-get update && apt-get install -y zip"
+      - "./build-github-binaries.sh"
+    when:
+      event:
+        - tag

@@ -1,0 +1,520 @@
+groups:
+    - name: recording_rules
+      rules:   
+        - record: pushgateway_exporter:pushgateway_cpu_usage:cpu_used_percents
+          expr: 100 - 100 * (pushgateway_cpu_usage_minimum / pushgateway_cpu_maximum)     
+  
+        - record: pushgateway_exporter:pushgateway_cpu_usage:cpu_used_percents
+          expr: 100 - 100 * (pushgateway_cpu_usage_minimum / pushgateway_cpu_maximum)
+
+        - record: mysql_slave_lag_seconds
+          expr: mysql_slave_status_seconds_behind_master - mysql_slave_status_sql_delay
+            
+        - record: mysql_heartbeat_lag_seconds
+          expr: mysql_heartbeat_now_timestamp_seconds - mysql_heartbeat_stored_timestamp_seconds
+            
+        - record: job:mysql_transactions:rate5m
+          expr: sum(rate(mysql_global_status_commands_total{command=~"(commit|rollback)"}[5m]))
+            WITHOUT (command)
+
+    - name: Node Exporter Alerts
+      rules:
+        - alert: HostNodeOvertemperatureAlarm
+          expr: node_hwmon_temp_alarm == 1
+          for: 5m
+          labels:
+            severity: error
+          annotations:
+            summary: "Host node overtemperature alarm (instance {{ $labels.instance }})"
+            description: "Physical node temperature alarm triggered\n  VALUE = {{ $value }}\n  LABELS: {{ $labels }}"
+
+        - alert: HostPhysicalComponentTooHot
+          expr: node_hwmon_temp_celsius > 75
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Host physical component too hot (instance {{ $labels.instance }})"
+            description: "Physical hardware component too hot\n  VALUE = {{ $value }}\n  LABELS: {{ $labels }}"
+
+        - alert: HostSystemdServiceCrashed
+          expr: node_systemd_unit_state{state="failed"} == 1
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Host SystemD service crashed (instance {{ $labels.instance }})"
+            description: "SystemD service crashed\n  VALUE = {{ $value }}\n  LABELS: {{ $labels }}"
+
+        - alert: HostSwapIsFillingUp
+          expr: (1 - (node_memory_SwapFree_bytes / node_memory_SwapTotal_bytes)) * 100 > 80
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Host swap is filling up (instance {{ $labels.instance }})"
+            description: "Swap is filling up (>80%)\n  VALUE = {{ $value }}\n  LABELS: {{ $labels }}"
+
+        - alert: HostContextSwitching
+          expr: rate(node_context_switches_total[5m]) > 1000
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Host context switching (instance {{ $labels.instance }})"
+            description: "Context switching is growing on node (> 1000 / s)\n  VALUE = {{ $value }}\n  LABELS: {{ $labels }}"
+
+        - alert: HostHighCpuLoad
+          expr: 100 - (avg by(instance) (irate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 80
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Host high CPU load (instance {{ $labels.instance }})"
+            description: "CPU load is > 80%\n  VALUE = {{ $value }}\n  LABELS: {{ $labels }}"
+
+        - alert: HostUnusualDiskWriteLatency
+          expr: rate(node_disk_write_time_seconds_total[1m]) / rate(node_disk_writes_completed_total[1m]) > 100
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Host unusual disk write latency (instance {{ $labels.instance }})"
+            description: "Disk latency is growing (write operations > 100ms)\n  VALUE = {{ $value }}\n  LABELS: {{ $labels }}"
+
+        - alert: HostUnusualDiskReadLatency
+          expr: rate(node_disk_read_time_seconds_total[1m]) / rate(node_disk_reads_completed_total[1m]) > 100
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Host unusual disk read latency (instance {{ $labels.instance }})"
+            description: "Disk latency is growing (read operations > 100ms)\n  VALUE = {{ $value }}\n  LABELS: {{ $labels }}"
+
+        - alert: HostOutOfInodes
+          expr: node_filesystem_files_free{mountpoint ="/rootfs"} / node_filesystem_files{mountpoint ="/rootfs"} * 100 < 10
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Host out of inodes (instance {{ $labels.instance }})"
+            description: "Disk is almost running out of available inodes (< 10% left)\n  VALUE = {{ $value }}\n  LABELS: {{ $labels }}"
+
+        - alert: HostDiskWillFillIn4Hours
+          expr: predict_linear(node_filesystem_free_bytes{fstype!~"tmpfs"}[1h], 4 * 3600) < 0
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Host disk will fill in 4 hours (instance {{ $labels.instance }})"
+            description: "Disk will fill in 4 hours at current write rate\n  VALUE = {{ $value }}\n  LABELS: {{ $labels }}"
+
+        - alert: HostOutOfDiskSpace
+          expr: (node_filesystem_avail_bytes{mountpoint="/rootfs"}  * 100) / node_filesystem_size_bytes{mountpoint="/rootfs"} < 10
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Host out of disk space (instance {{ $labels.instance }})"
+            description: "Disk is almost full (< 10% left)\n  VALUE = {{ $value }}\n  LABELS: {{ $labels }}"
+
+        - alert: HostUnusualDiskWriteRate
+          expr: sum by (instance) (irate(node_disk_written_bytes_total[2m])) / 1024 / 1024 > 50
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Host unusual disk write rate (instance {{ $labels.instance }})"
+            description: "Disk is probably writing too much data (> 50 MB/s)\n  VALUE = {{ $value }}\n  LABELS: {{ $labels }}"
+
+        - alert: HostUnusualDiskReadRate
+          expr: sum by (instance) (irate(node_disk_read_bytes_total[2m])) / 1024 / 1024 > 50
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Host unusual disk read rate (instance {{ $labels.instance }})"
+            description: "Disk is probably reading too much data (> 50 MB/s)\n  VALUE = {{ $value }}\n  LABELS: {{ $labels }}"
+        
+        - alert: HostUnusualNetworkThroughputOut
+          expr: sum by (instance) (irate(node_network_transmit_bytes_total[2m])) / 1024 / 1024 > 100
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Host unusual network throughput out (instance {{ $labels.instance }})"
+            description: "Host network interfaces are probably sending too much data (> 100 MB/s)\n  VALUE = {{ $value }}\n  LABELS: {{ $labels }}"
+
+        - alert: HostUnusualNetworkThroughputIn
+          expr: sum by (instance) (irate(node_network_receive_bytes_total[2m])) / 1024 / 1024 > 100
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Host unusual network throughput in (instance {{ $labels.instance }})"
+            description: "Host network interfaces are probably receiving too much data (> 100 MB/s)\n  VALUE = {{ $value }}\n  LABELS: {{ $labels }}"
+        
+        - alert: HostMemoryUnderMemoryPressure
+          expr: rate(node_vmstat_pgmajfault[1m]) > 1000
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Host memory under memory pressure (instance {{ $labels.instance }})"
+            description: "The node is under heavy memory pressure. High rate of major page faults\n  VALUE = {{ $value }}\n  LABELS: {{ $labels }}"
+
+        - alert: HostOutOfMemory
+          expr: node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes * 100 < 10
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Host out of memory (instance {{ $labels.instance }})"
+            description: "Node memory is filling up (< 10% left)\n  VALUE = {{ $value }}\n  LABELS: {{ $labels }}"
+        
+        - alert: Node Exporter Indisponível
+          expr: up{job="node_exporter"} == 0
+          for: 1m
+          labels:
+            severity: critical
+          annotations:
+            title: Node na instância {{ $labels.instance }} - está indisponível
+            description: Falha ao coletar o {{ $labels.job }} na {{ $labels.instance }} no último minuto. Node parece estar fora.
+        
+        - alert: RAID degradado
+          expr: (node_md_disks - node_md_disks_active) != 0
+          for: 1m
+          labels:
+            severity: warning
+          annotations:
+            title: MDRAID no node {{ $labels.instance }} está em modo de degradação
+            description: 'Matriz RAID Degradada {{ $labels.device }} na {{ $labels.instance }}: {{ $value }} discos falharam.'
+        
+        - alert: Pouco Espaço Disponível
+          expr: (node_filesystem_free{mountpoint !~ "/mnt.*"} / node_filesystem_size{mountpoint !~ "/mnt.*"} * 100) < 15
+          for: 1m
+          labels:
+            severity: warning
+          annotations:
+            title: 'Pouco espaço disponivel em {{ $labels.instance }}'
+            description: 'No {{ $labels.instance }} dispositivo {{ $labels.device }} montado em {{ $labels.mountpoint }} há pouco espaço em disco disponível {{ $value }}%'
+  
+        - alert: MemoryFree10%
+          expr: node_exporter:node_memory_free:memory_used_percents >= 90
+          for: 1m
+          labels:
+            severity: critical
+          annotations:
+            summary: "Instance {{ $labels.instance }} hight memory usage"
+            description: "{{ $labels.instance }} has more than 90% of its memory used."
+  
+        - alert: DiskSpace10%Free
+          expr: node_exporter:node_filesystem_free:fs_used_percents >= 90
+          for: 1m
+          labels:
+            severity: moderate
+          annotations:
+            summary: "Instance {{ $labels.instance }} is low on disk space"
+            description: "{{ $labels.instance }} has only {{ $value }}% free."
+
+        - alert: CPU_Usage
+          expr: pushgateway_exporter:pushgateway_cpu_usage:fs_used_percents >= 65
+          for: 1m
+          labels:
+            severity: moderate
+          annotations:
+            summary: "Instance {{ $labels.instance }} is high cpu usage)"
+            description: "{{ $labels.instance }} has {{ $value }}% CPU used."
+
+        - alert: CPU_Usage
+          expr: pushgateway_exporter:pushgateway_cpu_usage:fs_used_percents >= 90
+          for: 1m
+          labels:
+            severity: critical
+          annotations:
+            summary: "Instance {{ $labels.instance }} is high cpu usage)"
+            description: "{{ $labels.instance }} has {{ $value }}% CPU used."
+      
+    - name: MySQL Alerts
+      rules:
+        - alert: MySQLGaleraNotReady
+          expr: mysql_global_status_wsrep_ready != 1
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            description: '{{$labels.job}} on {{$labels.instance}} is not ready.'
+            summary: Galera cluster node not ready
+        
+        - alert: MySQLGaleraOutOfSync
+          expr: (mysql_global_status_wsrep_local_state != 4 and mysql_global_variables_wsrep_desync == 0)
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            description: '{{$labels.job}} on {{$labels.instance}} is not in sync ({{$value}} != 4).'
+            summary: Galera cluster node out of sync
+        
+        - alert: MySQLGaleraDonorFallingBehind
+          expr: (mysql_global_status_wsrep_local_state == 2 and mysql_global_status_wsrep_local_recv_queue > 100)
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            description: '{{$labels.job}} on {{$labels.instance}} is a donor (hotbackup) and is falling behind (queue size {{$value}}).'
+            summary: xtradb cluster donor node falling behind
+        
+        - alert: MySQLReplicationNotRunning
+          expr: mysql_slave_status_slave_io_running == 0 or mysql_slave_status_slave_sql_running == 0
+          for: 2m
+          labels:
+            severity: critical
+          annotations:
+            description: Slave replication (IO or SQL) has been down for more than 2 minutes.
+            summary: Slave replication is not running
+        
+        - alert: MySQLReplicationLag
+          expr: (mysql_slave_lag_seconds > 30) and ON(instance) (predict_linear(mysql_slave_lag_seconds[5m], 60 * 2) > 0)
+          for: 1m
+          labels:
+            severity: critical
+          annotations:
+            description: The mysql slave replication has fallen behind and is not recovering
+            summary: MySQL slave replication is lagging
+        
+        - alert: MySQLReplicationLag
+          expr: (mysql_heartbeat_lag_seconds > 30) and ON(instance) (predict_linear(mysql_heartbeat_lag_seconds[5m], 60 * 2) > 0)
+          for: 1m
+          labels:
+            severity: critical
+          annotations:
+            description: The mysql slave replication has fallen behind and is not recovering
+            summary: MySQL slave replication is lagging
+        
+        - alert: MySQLInnoDBLogWaits
+          expr: rate(mysql_global_status_innodb_log_waits[15m]) > 10
+          labels:
+            severity: warning
+          annotations:
+            description: The innodb logs are waiting for disk at a rate of {{$value}} / second
+            summary: MySQL innodb log writes stalling
+        
+        - alert: MySQLPortDown
+          expr: mysql_global_variables_port == 0
+          for: 1m
+          labels:
+            severity: warning
+          annotations:
+            description: A  porta do Mysql esta down
+            summary: Verificacao da disponibilidade da  porta mysql
+
+    - name: Rabbitmq Alerts
+      rules:
+        - alert: ContainerVolumeUsage
+          expr: (1 - (sum(container_fs_inodes_free) BY (instance) / sum(container_fs_inodes_total) BY (instance)) * 100) > 80
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Container Volume usage (instance {{ $labels.instance }})"
+            description: "Container Volume usage is above 80%\n  VALUE = {{ $value }}\n  LABELS: {{ $labels }}"
+    
+        - alert: ContainerMemoryUsage
+          expr: (sum(container_memory_usage_bytes) BY (instance) / sum(container_memory_max_usage_bytes) BY (instance) * 100) > 80
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Container Memory usage (instance {{ $labels.instance }})"
+            description: "Container Memory usage is above 80%\n  VALUE = {{ $value }} \n  LABELS: {{ $labels }}"
+
+        - alert: ContainerCpuUsage
+          expr: (sum(rate(container_cpu_usage_seconds_total[3m])) BY (instance, name) * 100) > 80 
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Container CPU usage (instance {{ $labels.instance }})"
+            description: "Container CPU usage is above 80%\n  VALUE = {{ $value }}\n  LABELS: {{ $labels }}"
+          
+        - alert: ClusterDown
+          expr: sum(rabbitmq_running) < 3
+          for: 5m
+          labels:
+            severity: error
+          annotations:
+            summary: "Cluster down (instance {{ $labels.instance }})"
+            description: "Less than 3 nodes running in RabbitMQ cluster\n  VALUE = {{ $value }}\n  LABELS: {{ $labels }}"
+      
+        - alert: TooManyConnections
+          expr: rabbitmq_connectionsTotal > 1000
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Too many connections (instance {{ $labels.instance }})"
+            description: "RabbitMQ instance has too many connections (> 1000)\n  VALUE = {{ $value }}\n  LABELS: {{ $labels }}"
+       
+        - alert: TooManyMessagesInQueue
+          expr: rabbitmq_queue_messages_ready{queue="my-queue"} > 1000
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Too many messages in queue (instance {{ $labels.instance }})"
+            description: "Queue is filling up (> 1000 msgs)\n  VALUE = {{ $value }}\n  LABELS: {{ $labels }}"
+
+        - alert: SlowQueueConsuming
+          expr: time() - rabbitmq_queue_head_message_timestamp{queue="my-queue"} > 60
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Slow queue consuming (instance {{ $labels.instance }})"
+            description: "Queue messages are consumed slowly (> 60s)\n  VALUE = {{ $value }}\n  LABELS: {{ $labels }}"
+
+        - alert: NoConsumer
+          expr: rabbitmq_queue_consumers == 0
+          for: 5m
+          labels:
+            severity: error
+          annotations:
+            summary: "No consumer (instance {{ $labels.instance }})"
+            description: "Queue has no consumer\n  VALUE = {{ $value }}\n  LABELS: {{ $labels }}"
+
+        - alert: TooManyConsumers
+          expr: rabbitmq_queue_consumers > 1
+          for: 5m
+          labels:
+            severity: error
+          annotations:
+            summary: "Too many consumers (instance {{ $labels.instance }})"
+            description: "Queue should have only 1 consumer\n  VALUE = {{ $value }}\n  LABELS: {{ $labels }}"
+
+        - alert: UnactiveExchange
+          expr: rate(rabbitmq_exchange_messages_published_in_total{exchange="my-exchange"}[1m]) < 5
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Unactive exchange (instance {{ $labels.instance }})"
+            description: "Exchange receive less than 5 msgs per second\n  VALUE = {{ $value }}\n  LABELS: {{ $labels }}"
+
+    - name: Windows Alerts
+      rules:
+        - alert: CollectorError
+          expr: wmi_exporter_collector_success == 0
+          for: 5m
+          labels:
+            severity: error
+          annotations:
+            summary: "Collector Error (instance {{ $labels.instance }})"
+            description: "Collector {{ $labels.collector }} was not successful\n  VALUE = {{ $value }}\n  LABELS: {{ $labels }}" 
+
+        - alert: ServiceStatus
+          expr: wmi_service_status{status="ok"} != 1
+          for: 5m
+          labels:
+            severity: error
+          annotations:
+            summary: "Service Status (instance {{ $labels.instance }})"
+            description: "Windows Service state is not OK\n  VALUE = {{ $value }}\n  LABELS: {{ $labels }}"
+    
+        - alert: CpuUsage
+          expr: 100 - (avg by (instance) (irate(wmi_cpu_time_total{mode="idle"}[2m])) * 100) > 80
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "CPU Usage (instance {{ $labels.instance }})"
+            description: "CPU Usage is more than 80%\n  VALUE = {{ $value }}\n  LABELS: {{ $labels }}"
+    
+        - alert: DiskSpaceUsage
+          expr: 100.0 - 100 * ((wmi_logical_disk_free_bytes{} / 1024 / 1024 ) / (wmi_logical_disk_size_bytes{}  / 1024 / 1024)) > 80
+          for: 5m
+          labels:
+            severity: error
+          annotations:
+            summary: "Disk Space Usage (instance {{ $labels.instance }})"
+            description: "Disk Space on Drive is used more than 80%\n  VALUE = {{ $value }}\n  LABELS: {{ $labels }}"
+
+    - name: Nginx Alerts
+      rules:
+        - alert: NginxDown
+          expr: nginx_up == 0
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            description: Nginx está down
+            summary: Verificacao de disponibilidade da aplicação e porta
+      
+        - alert: Http Request
+          expr: rate(nginx_http_requests_total[1m]) > 10
+          for: 1m
+          labels:
+            severity: warning
+          annotations:
+            description: Quantidade de Requests acima de 10 por minuto.
+            summary: Numero de requests acima do normal da aplicacao
+
+    - name: BlackBox Alerts
+      rules:
+        - alert: BlackBoxProbePingSLow
+          expr: avg_over_time(probe_icmp_duration_seconds[1m]) > 1
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "BlackBox probe ping lento (instance {{ $labels.instance }})"
+            description: "BlackBox o ping está acima de 1s\n  VALUE = {{ $value }}\n  LABELS: {{ $labels }}"
+      
+        - alert: Ping falhou
+          expr: probe_success == 0
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Sem reposta de ping (instancia {{ $labels.instance }})"
+            description: "Sem reposta de ping\n VALUE = {{ $value }}\n  LABELS: {{ $labels }}"
+    
+    - name: Http Alerts
+      rules:
+        - alert: EndpointDown
+          expr: probe_sucess == 0
+          for: 10s
+          labels:
+            severity: "critical"
+          annotations:
+            sumary: "Endpoint down"
+
+    - name: Redis Alerts
+      rules:
+        - alert: Redis up
+          expr: redis_up == 0
+          for: 5m
+          labels:
+            severity: warning 
+          annotations:
+            summary: "Redis está Down (instnace {{ $labels.instance }})"
+            description: "Redis está down\n VALUE= {{ $value }} "
+      
+        - alert: Redis key expiring
+          expr: redis_db_keys_expiring == 1
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            summary: "Chave {{ $labels }} expirou "
+            description: "Chave redis {{$labels }} espirou"
+
+    - name: Docker Alerts
+      rules:
+        - alert: InstanceDown
+          expr: docker_up == 0
+          for: 5m
+          labels:
+            severity: warning
+          annotations:
+            description: "Instance {{ $labels.instance }} down"
+            summary: "{{ $labels.instance }} of job {{ $labels.job }} has been down for more than 5 minutes."

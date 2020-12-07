@@ -1,0 +1,21 @@
+route:
+  group_wait: 10s
+  group_interval: 5m
+  repeat_interval: 30m
+  receiver: "slack"
+  
+  routes:
+    - receiver: "slack"
+      group_wait: 10s
+      match_re:
+        severity: error|warning|major|critical
+      continue: true
+
+receivers:
+  - name: "slack"
+    slack_configs:
+      - api_url: 'https://hooks.slack.com/services/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'
+        send_resolved: true
+        channel: 'alertas'
+        username: evandro.santos@groove.tech
+        text: "{{ range .Alerts }}<!channel> {{ .Annotations.summary }}\n{{ .Annotations.description }}\n{{ end }}"

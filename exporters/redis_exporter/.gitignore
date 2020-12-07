@@ -1,0 +1,10 @@
+redis_exporter
+coverage.out
+coverage.txt
+dist/
+pkg/
+src/
+.build/
+.DS_Store
+.idea
+*.rdb

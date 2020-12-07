@@ -1,0 +1,6 @@
+--2020-02-10 19:00:10--  https://www.youtube.com/redirect?redir_token=N_QN3d9q7zlOHK-13hKhq4Y2ZIF8MTU4MTQ3NTQ1OUAxNTgxMzg5MDU5
+Resolving www.youtube.com (www.youtube.com)... 172.217.28.238, 172.217.28.78, 172.217.28.14, ...
+Connecting to www.youtube.com (www.youtube.com)|172.217.28.238|:443... connected.
+HTTP request sent, awaiting response... 404 Not Found
+2020-02-10 19:00:11 ERROR 404: Not Found.
+

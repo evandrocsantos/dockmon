@@ -1,0 +1,119 @@
+global:
+  scrape_interval: 15s
+  scrape_timeout: 10s
+  evaluation_interval: 1m
+
+rule_files:
+  - 'prometheus.rules.yml'
+
+alerting:
+  alertmanagers:
+  - scheme: http
+    static_configs:
+    - targets:
+      - "IP DA MÁQUINA:9093"
+
+scrape_configs:
+
+  - job_name: 'prometheus'
+    scrape_interval: 5s
+    static_configs:
+      - targets: ['localhost:9090']
+
+  - job_name: 'node_exporter'
+    scrape_interval: 5s
+    static_configs:
+      - targets: [IP DA MÁQUINA:9100]
+
+  - job_name: 'snmp'
+    static_configs:
+      - targets:
+        - IP DO ALVO
+    metrics_path: /snmp
+    params:
+      module: [if_mib]
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: IP DA MAQUINA:9116
+  
+  - job_name: ‘rabbitmq’
+    static_configs:
+      - targets: [‘IP DA MÁQUINA:15672’]
+    metrics_path: /api/metrics
+
+  - job_name: ‘pushgateway’
+    scrape_interval: 1s
+    static_configs:
+      - targets: [IP DA MÁQUINA:9091]
+  
+  - job_name: 'mysql_exporter'
+    scrape_interval: 15s
+    static_configs:
+      - targets: ['IP DA MÁQUINA:9104', 'IP DA MÁQUINA:9105']
+
+  - job_name: 'java-exp'
+    scrape_interval: 5s
+    static_configs:
+      - targets: ['IP DA MÁQUINA:8080']
+
+  - job_name: 'alertmanager'
+    scrape_interval: 5s
+    static_configs:
+      - targets: ['localhost:9093']
+    metrics_path: /#/alerts
+
+  - job_name: 'nginx'
+    scrape_interval: 5s
+    static_configs:
+      - targets: ['IP DA MAQUINA:9113']
+
+  - job_name: 'blackbox'
+    metrics_path: /probe
+    params:
+      module: [icmp]
+    static_configs:
+      - targets:
+        - localhost
+        - prometheus.io
+        - IP DO ALVO
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: IP DA MÁQUINA:9115    # Conflito de Portas - HTTP EXPORTER
+
+  - job_name: 'http_exporter'
+    static_configs:
+      - targets:
+        - IP DO ALVO
+    metrics_path: /probe
+    params:
+      module: [http_2xx]
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: IP DA MÁQUINA:9115   # Conflito de Portas - BLACKBOX EXPORTER
+  
+  - job_name: ‘apache’
+    static_configs:
+      - targets: [‘IP DO APACHE_EXPORTER:9117']
+    scrape_interval: 5s
+
+  - job_name: 'redis_exporter'
+    static_configs:
+      - targets:
+        - IP DA MÁQUINA:9121
+
+  - job_name: 'docker_exporter'
+    static_configs:
+      - targets:
+        - IP DA MÁQUINA:9323
