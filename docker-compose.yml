@@ -21,13 +21,6 @@ services:
       - 443:443
       - 1234:1234
   
-  promtool:
-    image: jacknagel/promtool
-    container_name: dockmon-promtool
-    volumes: 
-      - ./prometheus:/tmp/
-    command: check config /tmp/prometheus.yml
-  
   prometheus:
     image: prom/prometheus:latest
     container_name: dockmon-prometheus-monitoring
@@ -44,8 +37,7 @@ services:
       - '--web.external-url=https://localhost:1234'
     ports:
       - 9090:9090
-    depends_on: 
-      - promtool
+    
 
   alertmanager:
     image: prom/alertmanager
