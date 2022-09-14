@@ -23,7 +23,7 @@ Um outro ponto é o encapsulamento da aplicação de forma a isolar e preservar 
 O primeiro passo é configurar a chave de acesso ao repositório. Vamos nomeá-la 'commit':
 
 ```gherkin=
-ssh-keygen -t rsa -b 4096 -C "euandros@vansor.tech"
+ssh-keygen -t rsa -b 4096 -C "euandros@vansor.com.br"
 Generating public/private rsa key pair.
 Enter file in which to save the key (/home/esantos/.ssh/id_rsa): /home/esantos/.ssh/commit
 Enter passphrase (empty for no passphrase):
